@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Screenshot-to-Repro — Bug Triage Intake</title>
+<style>
+:root {
+  --bg: #10141c; --panel: #1a2130; --panel2: #212a3d; --text: #f2f5fa;
+  --muted: #9fb0c9; --accent: #4f8cff; --ok: #35c06e; --warn: #ffb224;
+  --bad: #ff5d5d; --bar: #4f8cff; --border: #33405a;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 17px/1.45 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+header { padding: 18px 28px; background: var(--panel); border-bottom: 2px solid var(--border);
+  display: flex; align-items: center; gap: 16px; }
+header h1 { font-size: 26px; margin: 0; }
+.badge { display: inline-block; border-radius: 999px; padding: 4px 14px;
+  font-size: 15px; font-weight: 700; }
+.badge.mock { background: var(--warn); color: #201600; }
+.badge.real { background: var(--ok); color: #00230f; }
+.badge.esc { background: var(--warn); color: #201600; margin-left: 8px; font-size: 13px; }
+.badge.newbug { background: var(--bad); color: #fff; }
+.badge.matched { background: var(--ok); color: #00230f; }
+main { display: grid; grid-template-columns: minmax(380px, 480px) 1fr; gap: 22px;
+  padding: 22px 28px; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  padding: 20px; margin-bottom: 20px; }
+.card h2 { margin: 0 0 14px; font-size: 21px; }
+label { display: block; margin: 14px 0 6px; font-weight: 600; }
+select, textarea, input[type=file] { width: 100%; padding: 12px; font-size: 17px;
+  background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 10px; }
+textarea { min-height: 84px; resize: vertical; }
+button { margin-top: 18px; width: 100%; padding: 14px; font-size: 19px; font-weight: 700;
+  background: var(--accent); color: #fff; border: 0; border-radius: 10px; cursor: pointer; }
+button:disabled { opacity: .5; cursor: wait; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+/* probability bars */
+.bar-row { display: grid; grid-template-columns: 190px 1fr 64px; gap: 10px;
+  align-items: center; margin: 9px 0; }
+.bar-row .label { font-size: 16px; overflow: hidden; text-overflow: ellipsis; }
+.bar-track { background: var(--panel2); border-radius: 6px; height: 26px; }
+.bar-fill { height: 100%; background: var(--bar); border-radius: 6px; }
+.bar-fill.win { background: var(--ok); }
+.bar-row .pct { text-align: right; font-variant-numeric: tabular-nums; }
+/* decision lines */
+.decision { font-size: 19px; margin: 10px 0; }
+.decision b { font-size: 21px; }
+.kv { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.kv .item { background: var(--panel2); border-radius: 10px; padding: 12px; }
+.kv .item .k { color: var(--muted); font-size: 15px; }
+.kv .item .v { font-size: 20px; font-weight: 700; }
+pre.repro { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px; white-space: pre-wrap; font-size: 15px; }
+.issue { background: var(--panel2); border-radius: 10px; padding: 12px; margin: 6px 0; }
+.issue .t { font-weight: 700; font-size: 18px; }
+.issue .s { color: var(--muted); font-size: 15px; }
+/* recent reports */
+.report { display: flex; gap: 12px; align-items: center; background: var(--panel2);
+  border-radius: 10px; padding: 10px 14px; margin: 8px 0; cursor: pointer; }
+.report:hover { outline: 2px solid var(--accent); }
+.report .thumb { width: 64px; height: 44px; object-fit: cover; border-radius: 6px; }
+.report .meta { flex: 1; font-size: 15px; color: var(--muted); }
+.report .cat { font-weight: 700; color: var(--text); font-size: 16px; }
+#result-empty { color: var(--muted); font-size: 18px; padding: 30px 0; text-align: center; }
+#result-image { max-width: 100%; border-radius: 10px; border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Screenshot-to-Repro</h1>
+  <span id="mode-badge" class="badge">…</span>
+</header>
+<main>
+  <div>
+    <div class="card">
+      <h2>Report a bug</h2>
+      <label for="file">Screenshot</label>
+      <input type="file" id="file" accept="image/png,image/jpeg,image/webp">
+      <label for="description">Description (optional)</label>
+      <textarea id="description" placeholder="What were you doing when this happened?"></textarea>
+      <label for="mode">Triage mode</label>
+      <select id="mode">
+        <option value="cascade">Cascade (Drex, escalate to frontier)</option>
+        <option value="drex_only">Drex only</option>
+        <option value="frontier_only">Frontier only</option>
+      </select>
+      <label for="threshold">Cascade threshold: <span id="threshold-val">0.70</span></label>
+      <input type="range" id="threshold" min="0.05" max="0.95" step="0.05" value="0.7">
+      <button id="submit">Run triage</button>
+      <p id="submit-error" style="color:var(--bad);min-height:22px"></p>
+    </div>
+    <div class="card">
+      <h2>Known issues</h2>
+      <div id="known-issues"></div>
+    </div>
+  </div>
+  <div>
+    <div class="card">
+      <h2>Triage result</h2>
+      <div id="result"><div id="result-empty">Upload a screenshot and run triage.</div></div>
+    </div>
+    <div class="card">
+      <h2>Recent reports</h2>
+      <div id="reports"><div id="reports-empty" style="color:var(--muted)">No reports yet.</div></div>
+    </div>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
+  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function j(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+  return r.json();
+}
+
+function bars(container, probs, win, note) {
+  const div = document.createElement("div");
+  for (const [opt, p] of Object.entries(probs)) {
+    const pct = (100 * p);
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.innerHTML =
+      `<span class="label" title="${esc(opt)}">${esc(opt)}</span>` +
+      `<span class="bar-track"><span class="bar-fill ${opt === win ? "win" : ""}" style="width:${pct.toFixed(1)}%"></span></span>` +
+      `<span class="pct">${pct.toFixed(1)}%</span>`;
+    div.appendChild(row);
+  }
+  if (note) {
+    const n = document.createElement("div");
+    n.style.color = "var(--muted)"; n.style.fontSize = "14px";
+    n.textContent = note; div.appendChild(n);
+  }
+  container.appendChild(div);
+}
+
+function stepBlock(title, step) {
+  const wrap = document.createElement("div");
+  wrap.className = "card"; wrap.style.marginBottom = "14px";
+  let escBadge = step.escalated ? '<span class="badge esc">escalated to frontier model</span>' : "";
+  let html = `<h2>${title} <span style="color:var(--muted);font-size:15px;font-weight:400">via ${esc(step.model)} · ${step.latency_ms.toFixed(0)} ms · $${(1000 * step.cost_usd).toFixed(2)}/1k</span>${escBadge}</h2>`;
+  html += `<div class="decision">Decision: <b>${esc(step.decision)}</b>` +
+    (step.confidence != null ? ` <span style="color:var(--muted)">(${(100 * step.confidence).toFixed(1)}%)</span>` : "") + `</div>`;
+  wrap.innerHTML = html;
+  if (step.probabilities) {
+    bars(wrap, step.probabilities, step.decision);
+  } else {
+    const n = document.createElement("div");
+    n.style.color = "var(--muted)";
+    n.textContent = "Model did not return a probability distribution; confidence shown above.";
+    wrap.appendChild(n);
+  }
+  return wrap;
+}
+
+function showResult(result, imageId) {
+  const r = $("result");
+  r.innerHTML = "";
+  const steps = result.steps;
+  if (imageId) {
+    const img = document.createElement("img");
+    img.id = "result-image"; img.src = `/api/reports/${imageId}/image`;
+    img.alt = "triaged screenshot";
+    r.appendChild(img);
+    r.appendChild(document.createElement("br"));
+  }
+  const mockTag = result.mock ? " (MOCK)" : "";
+  r.appendChild(stepBlock(`Gate${mockTag}`, steps.gate));
+  r.appendChild(stepBlock(`Category${mockTag}`, steps.category));
+  const matchBlock = stepBlock(`Known-issue match${mockTag}`, steps.match);
+  r.appendChild(matchBlock);
+  if (result.known_issue) {
+    const d = document.createElement("div"); d.className = "issue";
+    d.innerHTML = `<span class="badge matched">matched</span> ` +
+      `<span class="t">${esc(result.known_issue.id)} — ${esc(result.known_issue.title)}</span>` +
+      `<div class="s">${esc(result.known_issue.summary)}</div>`;
+    matchBlock.after(d);
+  } else if (result.new_bug) {
+    const d = document.createElement("div"); d.className = "issue";
+    d.innerHTML = `<span class="badge newbug">NEW BUG</span> no known issue matched`;
+    matchBlock.after(d);
+  }
+  const kv = document.createElement("div"); kv.className = "card";
+  const tag = result.mock ? " (MOCK DATA — not a real measurement)" : "";
+  kv.innerHTML = `<h2>Cost &amp; latency${tag}</h2><div class="kv">` +
+    `<div class="item"><div class="k">Decision latency</div><div class="v">${result.latency_ms.toFixed(0)} ms</div></div>` +
+    `<div class="item"><div class="k">Total latency (incl. draft)</div><div class="v">${result.total_latency_ms.toFixed(0)} ms</div></div>` +
+    `<div class="item"><div class="k">Decision cost / 1 image</div><div class="v">$${result.cost_usd.decision.toFixed(5)}</div></div>` +
+    `<div class="item"><div class="k">Repro-draft cost</div><div class="v">$${result.cost_usd.draft.toFixed(5)}</div></div>` +
+    `<div class="item"><div class="k">Mode</div><div class="v">${esc(result.mode)}${result.mode === "cascade" ? " @ " + result.threshold : ""}</div></div>` +
+    `<div class="item"><div class="k">Escalated steps</div><div class="v">${result.escalated_steps.length ? esc(result.escalated_steps.join(", ")) : "none"}</div></div>` +
+    `</div>`;
+  r.appendChild(kv);
+  if (result.repro_draft) {
+    const d = document.createElement("div"); d.className = "card";
+    const mtag = result.repro_draft.mock ? " (MOCK)" : "";
+    d.innerHTML = `<h2>Drafted repro steps${mtag}</h2><pre class="repro">${esc(result.repro_draft.text)}</pre>`;
+    r.appendChild(d);
+  }
+}
+
+async function refreshReports() {
+  const reports = await j("/api/reports");
+  const el = $("reports");
+  el.innerHTML = "";
+  if (!reports.length) { el.innerHTML = '<div style="color:var(--muted)">No reports yet.</div>'; return; }
+  for (const rep of reports.slice(0, 12)) {
+    const d = new Date(rep.created_at * 1000);
+    const row = document.createElement("div");
+    row.className = "report";
+    row.innerHTML =
+      `<img class="thumb" src="/api/reports/${rep.id}/image" alt="">` +
+      `<span class="meta"><span class="cat">${esc(rep.result.steps.category.decision)}</span>` +
+      ` · ${esc(rep.result.mode)}` +
+      (rep.result.new_bug ? " · <span class='badge newbug'>NEW</span>" : "") +
+      `<br>${d.toLocaleString()} ${esc(rep.description || "")}</span>`;
+    row.onclick = () => { showResult(rep.result, rep.id); };
+    el.appendChild(row);
+  }
+}
+
+$("threshold").oninput = (e) => { $("threshold-val").textContent = (+e.target.value).toFixed(2); };
+
+$("submit").onclick = async () => {
+  const f = $("file").files[0];
+  if (!f) { $("submit-error").textContent = "Choose a screenshot first."; return; }
+  $("submit-error").textContent = "";
+  $("submit").disabled = true;
+  const form = new FormData();
+  form.append("file", f);
+  form.append("mode", $("mode").value);
+  form.append("threshold", $("threshold").value);
+  form.append("description", $("description").value);
+  try {
+    const record = await j("/api/triage", { method: "POST", body: form });
+    showResult(record.result, record.id);
+    await refreshReports();
+  } catch (e) {
+    $("submit-error").textContent = "Triage failed: " + e.message;
+  } finally {
+    $("submit").disabled = false;
+  }
+};
+
+(async function init() {
+  const cfg = await j("/api/config");
+  const badge = $("mode-badge");
+  badge.textContent = cfg.mock ? "MOCK MODE — no real model calls" : "LIVE MODE";
+  badge.className = "badge " + (cfg.mock ? "mock" : "real");
+  const issues = await j("/api/known-issues");
+  $("known-issues").innerHTML = issues.map((i) =>
+    `<div class="issue"><div class="t">${esc(i.id)} — ${esc(i.title)}</div><div class="s">${esc(i.summary)}</div></div>`
+  ).join("");
+  await refreshReports();
+})();
+</script>
+</body>
+</html>

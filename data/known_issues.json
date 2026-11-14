@@ -1,0 +1,32 @@
+[
+  {
+    "id": "KI-001",
+    "title": "Valid credentials rejected with 401 at login",
+    "category": "auth_failure",
+    "summary": "Logging in with a correct username and password still shows a 401 Unauthorized banner because the session token is checked before the password."
+  },
+  {
+    "id": "KI-002",
+    "title": "Dashboard fails to load data after API gateway restart",
+    "category": "network_error",
+    "summary": "After the API gateway restarts, the dashboard shows a Failed to fetch / ECONNREFUSED error state until the connection pool warms up."
+  },
+  {
+    "id": "KI-003",
+    "title": "Orders card overflows the viewport on narrow screens",
+    "category": "ui_layout_glitch",
+    "summary": "At narrow widths the orders table and legend card overlap and the status strip extends past the right edge of the page."
+  },
+  {
+    "id": "KI-004",
+    "title": "Orders table stuck on the loading spinner",
+    "category": "data_not_loading",
+    "summary": "The orders page keeps showing the loading spinner and never renders the table when the pagination cursor is stale."
+  },
+  {
+    "id": "KI-005",
+    "title": "Editors get 403 when saving their own profile",
+    "category": "permission_denied",
+    "summary": "Users with the editor role receive a 403 Forbidden response when saving profile changes because the permission check reads the wrong claim."
+  }
+]

@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+data/screenshots/
+data/results/
+
+Drexathon2026_Marisol/
