@@ -1,8 +1,10 @@
 """Frontier LLM client — used ONLY for low-confidence escalations and for
 drafting reproduction steps for new bugs.
 
-The provider is selected by FRONTIER_PROVIDER ("openai" = any OpenAI-
-compatible chat-completions endpoint, "anthropic" = Messages API). API keys
+The provider is selected by FRONTIER_PROVIDER: "deepinfra" (default;
+DeepInfra's OpenAI-compatible chat-completions endpoint at
+https://api.deepinfra.com/v1/openai, key from DEEPINFRA_API_KEY), "openai"
+(any OpenAI-compatible endpoint) or "anthropic" (Messages API). API keys
 come from environment variables only and are sent only to the provider.
 
 With MOCK_MODE=1 no HTTP call is made: outputs are deterministic functions
@@ -115,7 +117,7 @@ def classify(image_path, options, description: str) -> dict:
 
     b64, mime = _image_parts(image_path)
     start = time.perf_counter()
-    if config.FRONTIER_PROVIDER == "openai":
+    if config.FRONTIER_PROVIDER in ("openai", "deepinfra"):
         resp = httpx.post(
             f"{config.FRONTIER_BASE_URL}/chat/completions",
             headers={"Authorization": f"Bearer {config.FRONTIER_API_KEY}"},
@@ -229,7 +231,7 @@ def draft_repro(image_path, description: str, category: str) -> str:
     )
     b64, mime = _image_parts(image_path)
     start = time.perf_counter()
-    if config.FRONTIER_PROVIDER == "openai":
+    if config.FRONTIER_PROVIDER in ("openai", "deepinfra"):
         resp = httpx.post(
             f"{config.FRONTIER_BASE_URL}/chat/completions",
             headers={"Authorization": f"Bearer {config.FRONTIER_API_KEY}"},

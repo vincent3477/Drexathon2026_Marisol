@@ -107,8 +107,14 @@ prefix commands with `MOCK_MODE=1`.
   - `NACE_API_KEY` — Drex Max key (`nace_sk_…`); `NACE_BASE_URL` and
     `NACE_MODEL` are editable in `app/config.py` (defaults match the hosted
     docs: `https://console.nace.ai`, `drex-max-v1.1`).
-  - `FRONTIER_API_KEY`, `FRONTIER_PROVIDER` (`openai` | `anthropic`),
-    `FRONTIER_MODEL`, `FRONTIER_BASE_URL` for the escalation/draft step.
+  - Second model (escalation/draft step) — **DeepInfra by default**
+    (`FRONTIER_PROVIDER=deepinfra`): set `DEEPINFRA_API_KEY` (`di-…` key from
+    deepinfra.com). It uses DeepInfra's OpenAI-compatible endpoint
+    `https://api.deepinfra.com/v1/openai` with the vision model
+    `Qwen/Qwen3-VL-30B-A3B-Instruct` (both overridable via `FRONTIER_MODEL` /
+    `FRONTIER_BASE_URL`). To use OpenAI or Anthropic instead, set
+    `FRONTIER_PROVIDER=openai|anthropic` plus `FRONTIER_API_KEY` /
+    `FRONTIER_MODEL`.
 - Cost estimates use the editable per-token price tables in `app/config.py`
   (`DREX_PRICING`, `FRONTIER_PRICING` — labeled estimates, not quotes).
 
@@ -153,5 +159,8 @@ The cascade sweep (0.50–0.95) trades cost against escalation rate; see
 - **Pricing is editable guesswork.** The price tables in `app/config.py` are
   clearly-labeled estimates; Drex billing is per input token, which the
   estimate reflects, but figures are not authoritative.
-- **The frontier client is implemented against standard OpenAI-compatible /
-  Anthropic Messages APIs** and has only been exercised in mock mode here.
+- **The second-model client is implemented against DeepInfra's
+  OpenAI-compatible API (default), OpenAI's chat-completions API and the
+  Anthropic Messages API.** The DeepInfra endpoint was live-verified
+  (unauthenticated probe) on 2026-11-14, but no real calls have been made
+  here; all runs were mock mode.

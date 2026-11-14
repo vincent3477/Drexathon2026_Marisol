@@ -40,15 +40,35 @@ NACE_BASE_URL = os.environ.get("NACE_BASE_URL", "https://console.nace.ai").rstri
 NACE_MODEL = os.environ.get("NACE_MODEL", "drex-max-v1.1")
 
 # ---------------------------------------------------------------------------
-# Frontier LLM (used only for escalation and repro drafts)
+# Second model: frontier LLM (used only for escalation and repro drafts).
+# Default provider: DeepInfra (OpenAI-compatible endpoint, vision models).
 # ---------------------------------------------------------------------------
-FRONTIER_PROVIDER = os.environ.get("FRONTIER_PROVIDER", "openai").lower()
-FRONTIER_API_KEY = os.environ.get("FRONTIER_API_KEY", "")
-FRONTIER_MODEL = os.environ.get("FRONTIER_MODEL", "gpt-4o")
+FRONTIER_PROVIDER = os.environ.get("FRONTIER_PROVIDER", "deepinfra").lower()
+
+if FRONTIER_PROVIDER == "deepinfra":
+    # DeepInfra key from its own env var; FRONTIER_API_KEY still works as a
+    # fallback so a single key var can be used for any provider.
+    FRONTIER_API_KEY = (os.environ.get("DEEPINFRA_API_KEY")
+                        or os.environ.get("FRONTIER_API_KEY", ""))
+else:
+    FRONTIER_API_KEY = os.environ.get("FRONTIER_API_KEY", "")
+
+_FRONTIER_DEFAULT_MODELS = {
+    "deepinfra": "Qwen/Qwen3-VL-30B-A3B-Instruct",  # vision model
+    "openai": "gpt-4o",
+    "anthropic": "claude-3-5-sonnet-20241022",
+}
+FRONTIER_MODEL = os.environ.get("FRONTIER_MODEL") or _FRONTIER_DEFAULT_MODELS.get(
+    FRONTIER_PROVIDER, "gpt-4o")
+
+_FRONTIER_DEFAULT_BASES = {
+    "deepinfra": "https://api.deepinfra.com/v1/openai",  # OpenAI-compatible
+    "openai": "https://api.openai.com/v1",
+    "anthropic": "https://api.anthropic.com",
+}
 FRONTIER_BASE_URL = os.environ.get(
     "FRONTIER_BASE_URL",
-    "https://api.openai.com/v1" if FRONTIER_PROVIDER == "openai"
-    else "https://api.anthropic.com",
+    _FRONTIER_DEFAULT_BASES.get(FRONTIER_PROVIDER, "https://api.openai.com/v1"),
 ).rstrip("/")
 
 # ---------------------------------------------------------------------------
@@ -82,6 +102,11 @@ DREX_PRICING = {
 
 FRONTIER_PRICING = {
     # provider: model: {in, out} — fall back to the provider's "_default".
+    "deepinfra": {
+        # estimates from deepinfra.com's published per-1M-token prices
+        "Qwen/Qwen3-VL-30B-A3B-Instruct": {"per_1m_input_tokens": 0.30, "per_1m_output_tokens": 0.60},
+        "_default": {"per_1m_input_tokens": 0.50, "per_1m_output_tokens": 1.00},
+    },
     "openai": {
         "gpt-4o": {"per_1m_input_tokens": 2.5, "per_1m_output_tokens": 10.0},
         "_default": {"per_1m_input_tokens": 3.0, "per_1m_output_tokens": 15.0},
